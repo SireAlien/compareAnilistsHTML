@@ -12,9 +12,9 @@ npm install
 ```
 
 ## Usage 
-Open an HTTP server in the directory of installation (i.e. with [http-server](https://www.npmjs.com/package/http-server) or [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) VSC extention), and access the page with a browser.
-In the *Number of users* field insert the number of users which list you want to compare and press *Submit*.
-Insert the usernames and press *Compare*
+Open an HTTP server in the directory of installation (i.e. with [http-server](https://www.npmjs.com/package/http-server) or [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) VSC extention), and access the page with a browser.\\
+In the *Number of users* field insert the number of users which list you want to compare and press *Submit*.\\
+Insert the usernames and press *Compare*.
 Each user's list will be displayed under their username, and under those will be the list of all titles shared between the users.
 
-You can change from *Title language* the title in which you want the titles to be displayed.
+You can change from *Title language* the language in which you want the titles to be displayed.
