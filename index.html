@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<style>
+table th + th{
+    border-left:1px solid black;
+}
+div.box{
+    height:270px; 
+    padding: 4px;
+    overflow:auto
+}
+label{
+    padding-right: 10px;
+    padding-bottom: 15px;
+}
+</style>
+
+<script type="module">
+import { graphql } from './node_modules/graphql/index.mjs';
+</script>
+<script> 
+function generateInputFields() {
+    const colCount = document.getElementById('colcount').value;
+    const inputFieldsContainer = document.getElementById('inputFields');
+    inputFieldsContainer.innerHTML = ''; // Clear previous input fields
+    inputFieldsContainer.style.padding = '10px';
+
+    const tableContainer = document.getElementById('userLists');
+    tableContainer.innerHTML = ''; // Clear previous tables
+
+    const setListBox = document.getElementById('setList');
+    setListBox.innerHTML = ''; // Clear previous set list
+
+    const compareButton = document.createElement('button');
+    compareButton.className = 'btn btn-primary';
+    compareButton.textContent = 'Compare';
+    compareButton.onclick = compare;
+    compareButton.style.padding = '2px';
+    inputFieldsContainer.appendChild(compareButton);
+
+    const table = document.createElement('table');
+    table.style.width = '100%';
+
+    //new row
+    const tr = document.createElement('tr');
+    tr.className = 'tr';
+
+    for (let i = 1; i <= colCount; i++) {
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control';
+        //input.id = `entry${i}`;
+        input.placeholder = `Username`;
+
+        const th = document.createElement('th');
+
+        th.appendChild(input);
+        tr.appendChild(th);
+    }
+    table.appendChild(tr);
+    inputFieldsContainer.appendChild(table);
+}
+</script>
+<script>
+const query = `
+query ($userName: String!) { # Define which variables will be used in the query (id)
+  MediaListCollection (type: ANIME, userName: $userName) { # Insert our variables into the query arguments (id)
+    lists {
+      name
+      entries {
+        id
+        media {
+          id
+          title {
+            romaji
+            english
+          }
+        }
+      }
+    }
+  }
+}
+`;
+const url = 'https://graphql.anilist.co';
+const options = {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }
+};
+
+function intersectSetList(currentSetList, entries) {
+    if (currentSetList.length === 0) {
+        return [...entries];
+    }
+
+    return currentSetList.filter((item) =>
+        entries.some((entry) => entry.id === item.id)
+    );
+}
+
+function compare() {
+    // Get all input fields of class form-control
+    const inputs = document.querySelectorAll('#inputFields .form-control');
+    const language = document.getElementById('language').value;
+    const values = Array.from(inputs);
+        
+    const tableContainer = document.getElementById('userLists');
+    tableContainer.innerHTML = ''; // Clear previous tables
+
+    const setListBox = document.getElementById('setList');
+    setListBox.innerHTML = ''; // Clear previous set list
+    var setList = [];
+
+    const table = document.createElement('table');
+    table.style.width = '100%';
+
+    const tr = document.createElement('tr');
+    const fetchPromises = values.map((input) => {
+        const userName = input.value;
+        const box = document.createElement('div');
+        box.className = 'box';
+        box.style.width = `${90 / values.length}vw`;
+
+        const td = document.createElement('td');
+        td.appendChild(box);
+        tr.appendChild(td);
+
+        return fetch(url, {
+            ...options,
+            body: JSON.stringify({ query: query, variables: { userName } })
+        })
+            .then(handleResponse)
+            .then((data) => {
+                const lists = data.data.MediaListCollection.lists;
+                let entries = [];
+
+                for (let k = 0; k < lists.length; k++) {
+                    if (lists[k].name === 'Completed') {
+                        entries = lists[k].entries.map((entry) => ({
+                            id: entry.media.id,
+                            romaji: entry.media.title.romaji,
+                            english: entry.media.title.english
+                        }));
+                        break;
+                    }
+                }
+
+                for (let j = 0; j < entries.length; j++) {
+                    const entryTitle = language === 'english'
+                        ? entries[j].english
+                        : entries[j].romaji;
+                    const title = document.createElement('p');
+                    title.textContent = entryTitle;
+                    box.appendChild(title);
+                }
+
+                setList = intersectSetList(setList, entries);
+            })
+            .catch((error) => {
+                handleError(error);
+                return null;
+            });
+    });
+
+    Promise.all(fetchPromises).then(() => {
+        setList.forEach((entry) => {
+            const entryTitle = language === 'english' ? entry.english : entry.romaji;
+            const title = document.createElement('p');
+            title.textContent = entryTitle;
+            setListBox.appendChild(title);
+        });
+    });
+
+    table.appendChild(tr);
+    tableContainer.appendChild(table);
+}
+
+</script>
+<script>
+function handleResponse(response) {
+    return response.json().then(function (json) {
+        return response.ok ? json : Promise.reject(json);
+    });
+}
+
+function handleError(error) {
+    alert('Error fetching list');
+    console.error(error);
+}
+</script>
+
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <!-- Field with button for n° of columns -->
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <div class="form-group">
+                    <label for="colcount">Number of columns</label>
+                    <input type="number" class="form-control" id="colcount" min="2">
+                    <br>
+                    <label for="language">Title language</label>
+                    <select id="language">
+                        <option value="romaji">Romaji</option>
+                        <option value="english">English</option>
+                    </select>
+                    <br>
+                    <button class="btn btn-primary" onclick="generateInputFields()">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Have as many input fields as the number of columns -->
+    <div class="container" id="inputFields">
+    </div>
+    <div class="container" id="userLists">
+    </div>
+    <div class="box" style="width: 100%; border-top: 1px solid black;" id="setList">
+    </div>
+
+
+</body>
+</html>
