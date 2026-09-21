@@ -23,12 +23,16 @@ function generateInputFields() {
     const inputFieldsContainer = document.getElementById('inputFields');
     inputFieldsContainer.innerHTML = ''; // Clear previous input fields
     inputFieldsContainer.style.padding = '10px';
+    inputFieldsContainer.style.textAlign = 'center';
 
     const tableContainer = document.getElementById('userLists');
     tableContainer.innerHTML = ''; // Clear previous tables
 
     const setListBox = document.getElementById('setList');
     setListBox.innerHTML = ''; // Clear previous set list
+
+    const uniqueTableContainer = document.getElementById('uniqueLists');
+    uniqueTableContainer.innerHTML = ''; // Clear previous tables
 
     const compareButton = document.createElement('button');
     compareButton.className = 'btn btn-primary';
@@ -90,13 +94,23 @@ const options = {
     }
 };
 
-function intersectSetList(currentSetList, entries) {
-    if (currentSetList.length === 0) {
-        return [...entries];
+function intersectList(currentList, entries, firstIter) {
+    if (currentList.length === 0) {
+        return firstIter?[...entries]:currentList;
     }
 
-    return currentSetList.filter((item) =>
+    return currentList.filter((item) =>
         entries.some((entry) => entry.id === item.id)
+    );
+}
+
+function subtractList(userList, otherList){
+    if(userList.length === 0){
+        return userList;
+    }
+
+    return userList.filter((item) =>
+        !otherList.some((entry) => entry.id === item.id)
     );
 }
 
@@ -104,29 +118,35 @@ function compare() {
     // Get all input fields of class form-control
     const inputs = document.querySelectorAll('#inputFields .form-control');
     const language = document.getElementById('language').value;
+    const listName = document.getElementById('listname').value;
+    const numbers = document.getElementById('numbers').checked;
+    // values is an array of username objects
     const values = Array.from(inputs);
         
     const tableContainer = document.getElementById('userLists');
-    tableContainer.innerHTML = ''; // Clear previous tables
+    tableContainer.innerHTML = ''; // Clear previous users' lists
 
     const setListBox = document.getElementById('setList');
-    setListBox.innerHTML = ''; // Clear previous set list
+    setListBox.innerHTML = ''; // Clear previous intersected list
+
+    const uniqueTableContainer = document.getElementById('uniqueLists');
+    uniqueTableContainer.innerHTML = ''; // Clear previous users' unique lists
+
+    var entriesList = {};
     var setList = [];
 
     const table = document.createElement('table');
-    table.style.width = '100%';
+    table.style.width = '90%';
+
+    const uniqueTable = document.createElement('table');
+    uniqueTable.style.width = '90%';
 
     const tr = document.createElement('tr');
+    const uniquetr = document.createElement('tr');
+    var firstIter = true
+    // fetch single users' list and create the intersected list
     const fetchPromises = values.map((input) => {
         const userName = input.value;
-        const box = document.createElement('div');
-        box.className = 'box';
-        box.style.width = `${90 / values.length}vw`;
-
-        const td = document.createElement('td');
-        td.appendChild(box);
-        tr.appendChild(td);
-
         return fetch(url, {
             ...options,
             body: JSON.stringify({ query: query, variables: { userName } })
@@ -135,9 +155,10 @@ function compare() {
             .then((data) => {
                 const lists = data.data.MediaListCollection.lists;
                 let entries = [];
-
+                
+                // Fetch entries from selected list
                 for (let k = 0; k < lists.length; k++) {
-                    if (lists[k].name === 'Completed') {
+                    if (lists[k].name === listName) {
                         entries = lists[k].entries.map((entry) => ({
                             id: entry.media.id,
                             romaji: entry.media.title.romaji,
@@ -146,17 +167,25 @@ function compare() {
                         break;
                     }
                 }
-
+                /* Old on-the-fly version, for other purposes it's be better to store the values first, display after
+                
+                // Display entries for every user 
+                
                 for (let j = 0; j < entries.length; j++) {
                     const entryTitle = language === 'english'
                         ? entries[j].english
                         : entries[j].romaji;
                     const title = document.createElement('p');
-                    title.textContent = entryTitle;
+                    title.textContent = numbers ? `${j + 1}. ${entryTitle}` : entryTitle;
                     box.appendChild(title);
                 }
+                */
 
-                setList = intersectSetList(setList, entries);
+                entriesList[userName] = entries
+
+                // Create intersection of entries
+                setList = intersectList(setList, entries, firstIter);
+                firstIter = false
             })
             .catch((error) => {
                 handleError(error);
@@ -164,17 +193,83 @@ function compare() {
             });
     });
 
+    // Once all lists are fetched, display them 
     Promise.all(fetchPromises).then(() => {
+        // Create unique lists 
+        var uniquesList = {}
+        values.forEach((userName)=>{
+            var uniqueList = entriesList[userName.value]
+            console.log(uniqueList)
+            values.forEach((otherUserName) =>{
+                if(!(userName.value === otherUserName.value)){
+                    uniqueList = subtractList(uniqueList, entriesList[otherUserName.value])
+                }
+            });
+            uniquesList[userName.value] = uniqueList;
+        });
+
+        // Display users' lists and unique lists
+        values.forEach((userName)=>{
+            // Each box contains user's list
+            const box = document.createElement('div');
+            box.className = 'box';
+            box.style.width = `${90 / values.length}vw`;
+
+            // Each td contains a box
+            const td = document.createElement('td');
+            td.appendChild(box);
+            tr.appendChild(td);
+
+            var entries = entriesList[userName.value]
+
+            for (let j = 0; j < entries.length; j++) {
+                const entryTitle = language === 'english'
+                    ? entries[j].english
+                    : entries[j].romaji;
+                const title = document.createElement('p');
+                title.textContent = numbers ? `${j + 1}. ${entryTitle}` : entryTitle;
+                box.appendChild(title);
+            }
+            
+            const uniquetd = document.createElement('td');
+            
+            // Each uniqueBox contains user's unique entries list
+            const uniqueBox = document.createElement('div');
+            uniqueBox.className = 'box';
+            uniqueBox.style.width = `${90 / values.length}vw`;
+
+            uniquetd.appendChild(uniqueBox);
+            uniquetr.appendChild(uniquetd);
+
+            var uniqueEntries = uniquesList[userName.value]
+            uniqueBox.appendChild(document.createElement('h3')).textContent = `Entries unique to ${userName.value}: ${uniqueEntries.length}`
+            uniquetd.appendChild(uniqueBox);
+            uniquetr.appendChild(uniquetd);
+
+            for (let j = 0; j < uniqueEntries.length; j++) {
+                const entryTitle = language === 'english'
+                    ? uniqueEntries[j].english
+                    : uniqueEntries[j].romaji;
+                const title = document.createElement('p');
+                title.textContent = numbers ? `${j + 1}. ${entryTitle}` : entryTitle;
+                uniqueBox.appendChild(title);
+            }
+        });
+        // Intersected list
+        setListBox.appendChild(document.createElement('h3')).textContent = `Entries in common: ${setList.length}`;
         setList.forEach((entry) => {
             const entryTitle = language === 'english' ? entry.english : entry.romaji;
             const title = document.createElement('p');
-            title.textContent = entryTitle;
+            title.textContent = numbers ? `${setList.indexOf(entry) + 1}. ${entryTitle}` : entryTitle;
             setListBox.appendChild(title);
         });
     });
 
     table.appendChild(tr);
     tableContainer.appendChild(table);
+
+    uniqueTable.appendChild(uniquetr);
+    uniqueTableContainer.appendChild(uniqueTable);
 }
 
 </script>
@@ -196,36 +291,58 @@ function handleError(error) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Compare AniList</title>
 </head>
 <body>
-    <!-- Field with button for n° of columns -->
-    <div class="container">
-        <div class="row">
-            <div class="col">
-                <div class="form-group">
-                    <label for="colcount">Number of columns</label>
-                    <input type="number" class="form-control" id="colcount" min="2">
-                    <br>
-                    <label for="language">Title language</label>
-                    <select id="language">
-                        <option value="romaji">Romaji</option>
-                        <option value="english">English</option>
-                    </select>
-                    <br>
-                    <button class="btn btn-primary" onclick="generateInputFields()">Submit</button>
+    <!-- Table to contain all items to make them look better-->
+    <table style="width: 80%; border: 1px solid black; border-collapse: collapse; margin: auto;">
+        <th class="container">
+            <!-- Field with button for n° of columns -->
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="colcount">Number of users</label>
+                        <input type="number" class="form-control" id="colcount" min="2">
+                        <button class="btn btn-primary" onclick="generateInputFields()">Submit</button>
+                        <br>
+                        <label for="language">Title language</label>
+                        <select id="language">
+                            <option value="romaji">Romaji</option>
+                            <option value="english">English</option>
+                        </select>
+                        <br>
+                        <label for="listname">Name of list to compare</label>
+                        <select id="listname">
+                            <option value="Completed">Completed</option>
+                            <option value="Watching">Watching</option>
+                            <option value="Planning">Planning</option>
+                            <option value="Paused">Paused</option>
+                            <option value="Dropped">Dropped</option>
+                        </select>
+                        <br>
+                        <label for="numbers">Numbered entries</label>
+                        <input type="checkbox" id="numbers">
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
+            <hr>
+        </th>
 
-    <!-- Have as many input fields as the number of columns -->
-    <div class="container" id="inputFields">
-    </div>
-    <div class="container" id="userLists">
-    </div>
-    <div class="box" style="width: 100%; border-top: 1px solid black;" id="setList">
-    </div>
+        <!-- Have as many input fields as the number of columns -->
+        <tr class="container" id="inputFields">
+        </tr>
+        <tr class="container" id="userLists">
+        </tr>
+        <tr><td>
+            <hr>
+            <div class="box" id="setList">
+            </div>
+            <hr>
+        </td></tr>
+        <tr class="container" id="uniqueLists">
+        </tr>
+    </table>
+
 
 
 </body>
