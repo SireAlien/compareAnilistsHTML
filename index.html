@@ -162,7 +162,7 @@ function compare() {
                         entries = lists[k].entries.map((entry) => ({
                             id: entry.media.id,
                             romaji: entry.media.title.romaji,
-                            english: entry.media.title.english
+                            english: entry.media.title.english != null? entry.media.title.english: entry.media.title.romaji
                         }));
                         break;
                     }
@@ -188,7 +188,7 @@ function compare() {
                 firstIter = false
             })
             .catch((error) => {
-                handleError(error);
+                handleError(error, userName);
                 return null;
             });
     });
@@ -280,8 +280,8 @@ function handleResponse(response) {
     });
 }
 
-function handleError(error) {
-    alert('Error fetching list');
+function handleError(error, userName) {
+    alert(`Error fetching list of ${userName}`);
     console.error(error);
 }
 </script>
